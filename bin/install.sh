@@ -61,6 +61,6 @@ chmod +x "$FILEOUTPUT"
 if [[ "$OS" == "windows" ]]; then
     mv "$FILEOUTPUT" "${NAME}"
 else
-    mv "$FILEOUTPUT" "${NAME}"
+    mv "$FILEOUTPUT" "/usr/local/bin/${NAME}"
 fi
-echo "${NAME} has been installed. and can be found in $(pwd)/${NAME}"
+echo "${NAME} has been installed."
