@@ -37,8 +37,8 @@ function build {
     echo >&2 "error: cannot zip file ${BINARYNAME}_${os}_${arch}${ext}"
     return 1
   }
-  sum=$(${sha256sumPath} ${BINARYNAME}_${os}_${arch}${ext} | awk '{print $1}')
-  echo "${BINARYNAME}_${os}_${arch}${ext} - ${sum}" >> sha256.txt
+  echo "${BINARYNAME}_${os}_${arch}${ext} - $(${sha256sumPath} ${BINARYNAME}_${os}_${arch}${ext} | awk '{print $1}')" >> sha256.txt
+  echo "${BINARYNAME}_${os}_${arch}${ext}.zip - $(${sha256sumPath} ${BINARYNAME}_${os}_${arch}${ext}.zip | awk '{print $1}')" >> sha256.txt
   cd ${CWD}
 }
 
