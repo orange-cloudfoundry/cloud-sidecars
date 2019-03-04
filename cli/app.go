@@ -13,6 +13,8 @@ import (
 	"github.com/orange-cloudfoundry/cloud-sidecars/starter"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+	"gopkg.in/yaml.v2"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -200,7 +202,12 @@ func retrieveConfig(c *cli.Context) (*config.SidecarsConfig, error) {
 	conf := &config.SidecarsConfig{}
 	err := gautocloud.Inject(conf)
 	if _, ok := err.(loader.ErrGiveService); ok {
-		return nil, fmt.Errorf("configuration error, see previous message: %s", err.Error())
+		log.Warnf("Cannot found configuration from gautocloud, fallback to %s file", confPath)
+		b, err := ioutil.ReadFile(confPath)
+		err = yaml.Unmarshal(b, conf)
+		if err != nil {
+			return nil, fmt.Errorf("configuration error, see previous message: %s", err.Error())
+		}
 	}
 	log.WithField("component", "cli").Debug("Finished loading configuration.")
 	return conf, err
