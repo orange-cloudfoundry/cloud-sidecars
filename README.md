@@ -6,14 +6,14 @@ Sidecar will be run locally inside your app and will run real app with configura
 If sidecar is a reverse proxy, it will overwrite real app configuration to make run your reverse proxy in front of the app.
 
 For now it only support 2 types:
-- Cloud foundry through its [buildpack](https://github.com/orange-cloudfoundry/cloud-sidecars-buildpack)
+- Cloud foundry through its [buildpack](https://github.com/orange-cloudfoundry/sidecars-buildpack)
 - Locally only for testing purpose before run
 
 ## installation
 
 ### On cloud foundry
 
-Use buildpack associated: https://github.com/orange-cloudfoundry/cloud-sidecars-buildpack
+Use buildpack associated: https://github.com/orange-cloudfoundry/sidecars-buildpack
 
 You can also install locally to be able to run `cloud-sidecar vendor` to vendor all sidecars in local for offline app.
 

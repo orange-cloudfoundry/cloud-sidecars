@@ -1,6 +1,6 @@
 language: go
 go:
-  - "1.11"
+  - '1.11'
 install:
   - go get github.com/onsi/ginkgo/ginkgo
   - go get github.com/onsi/gomega
@@ -14,4 +14,19 @@ script:
   - go test ./... -v
 after_success:
   - bin/build-all.sh
-
+deploy:
+  provider: releases
+  api_key:
+    secure: Y9AlSZYSLaKtYp2qonxJ0PfYTXAmUYJ3KQFB75H8iR+DQLQpTksreWL4N1dZGpiPUldvT/0EKK1luT3GcodO7VQ0XGivWtCJ+DsptlJvzuFHDqS4IFYM6EE0WQcdZDsoHXJjpBmN7r6y/mxtjS6+nv6/wSFnRlRMWcfAcJtx99zY+Eyb96te7X9h4uRp6Hfq4JIKBB9CXxnI5A3b52s3sXfF3b83AmnIfha3wE+0QgJI2NiZGtn24SBcqZ1c0An3Qz8bKFwgv8aMavh4oWFXKrfHafr+zVtLoZhnV5o3pZjUzk4zZlgS6Hc1a7hRpaxJvK0AkjebkGtxtqju2e9LQXRef3oI/Q/lbi4zX4paLpAsMx0dKZZ8S44ttH1ZqmWfNfL5/K0hFCL/VV79AfMfADdPjFTVyzAuncK58Qof/a3Z4LOQjzfnBUU4c9pXYzjwZg1h4VFUT1Lp1jo9ljP7oCbuJe7Z36MVUgfUN4RWb/0LaVaKkIrU1dTU40f+zrOOf2TlNnA0/HMMlaySsVBEKY/vB8Dfv4lqiHL4cr8IhQl+TLXIP9TfYVYSAuuufltcVwOLkr/ktJCxzNheNeE8FnYR/pY4NB2XaxHopn0a3CJoGa1lzzIg/qNnjhzD6jUBRoW+BVcE6oRjwObaM0RtBqjFTuLmdgItKSMJIeQ4T0c=
+  file:
+    - out/cloud-sidecars_darwin_amd64
+    - out/cloud-sidecars_linux_amd64
+    - out/cloud-sidecars_windows_amd64.exe
+    - out/cloud-sidecars_darwin_amd64.zip
+    - out/cloud-sidecars_linux_amd64.zip
+    - out/cloud-sidecars_windows_amd64.zip
+    - out/sha256.txt
+  on:
+    tags: true
+    all_branches: true
+  skip_cleanup: true
