@@ -1,4 +1,4 @@
-# Cloud-sidecars
+# Cloud-sidecars [![Build Status](https://travis-ci.com/orange-cloudfoundry/cloud-sidecars.svg?branch=master)](https://travis-ci.com/orange-cloudfoundry/cloud-sidecars)
 
 A CLI tool to run sidecars inside an app on different cloud environment.
 Sidecar will be run locally inside your app and will run real app with configuration set by sidecar.
