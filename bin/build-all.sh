@@ -38,7 +38,7 @@ function build {
     return 1
   }
   echo "${BINARYNAME}_${os}_${arch}${ext} - $(${sha256sumPath} ${BINARYNAME}_${os}_${arch}${ext} | awk '{print $1}')" >> sha256.txt
-  echo "${BINARYNAME}_${os}_${arch}${ext}.zip - $(${sha256sumPath} ${BINARYNAME}_${os}_${arch}${ext}.zip | awk '{print $1}')" >> sha256.txt
+  echo "${BINARYNAME}_${os}_${arch}.zip - $(${sha256sumPath} ${BINARYNAME}_${os}_${arch}.zip | awk '{print $1}')" >> sha256.txt
   cd ${CWD}
 }
 
