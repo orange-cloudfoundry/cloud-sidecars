@@ -9,28 +9,10 @@ import (
 	"os"
 )
 
-func DownloadSidecar(dir string, c *config.SidecarConfig, forceDl bool) error {
+func DownloadSidecar(dir string, c *config.SidecarConfig) error {
 	entry := log.WithField("component", "Downloader").WithField("sidecar", c.Name)
-	isEmpty, err := IsEmptyDir(dir)
-	if err != nil {
-		return err
-	}
-	if !isEmpty && !forceDl {
-		entry.Infof("Skipping downloading from %s (directory not empty, sidecar must be already downloaded)", c.ArtifactURL)
-		return nil
-	}
-	if !isEmpty {
-		err := os.RemoveAll(dir)
-		if err != nil {
-			return err
-		}
-		err = os.MkdirAll(dir, os.ModePerm)
-		if err != nil {
-			return err
-		}
-	}
 	entry.Infof("Downloading from %s ...", c.ArtifactURL)
-	err = DownloadArtifact(dir, c.ArtifactURL, c.ArtifactType)
+	err := DownloadArtifact(dir, c.ArtifactURL, c.ArtifactType)
 	if err != nil {
 		return err
 	}

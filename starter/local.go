@@ -81,3 +81,12 @@ func (Local) AppPort() int {
 	}
 	return port
 }
+
+func (s Local) ProxyProfile(appPort int) string {
+	if appPort == s.AppPort() {
+		return ""
+	}
+	return fmt.Sprintf(`
+export PORT=%d
+`, appPort)
+}

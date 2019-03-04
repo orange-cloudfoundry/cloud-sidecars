@@ -83,3 +83,13 @@ func (s CloudFoundry) ProxyEnv(appPort int) map[string]string {
 		"VCAP_APP_PORT":  sPort,
 	}
 }
+
+func (s CloudFoundry) ProxyProfile(appPort int) string {
+	if appPort == s.AppPort() {
+		return ""
+	}
+	return fmt.Sprintf(`
+export PORT=%d
+export VCAP_APP_PORT=%d
+`, appPort, appPort)
+}

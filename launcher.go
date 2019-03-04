@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"sync"
 	"syscall"
@@ -94,6 +95,17 @@ func (l Launcher) Setup() error {
 		entry.Infof("Finished setup.")
 	}
 	entryG.Infof("Finished setup sidecars.")
+	if l.cStarter == nil || l.sConfig.NoStarter {
+		return nil
+	}
+	entryG.WithField("starter", l.cStarter.CloudEnvName()).Info("Adding starter.sh profile")
+	err = ioutil.WriteFile(
+		filepath.Join(l.profileDir, "starter.sh"),
+		[]byte(l.cStarter.ProxyProfile(appPort)), 0755)
+	if err != nil {
+		return err
+	}
+	entryG.WithField("starter", l.cStarter.CloudEnvName()).Info("Finished adding starter.sh profile")
 	return nil
 }
 
@@ -104,12 +116,31 @@ func (l Launcher) DownloadArtifacts(forceDl bool) error {
 		if sidecar.ArtifactURL == "" {
 			continue
 		}
+		entry := entryG.WithField("sidecar", sidecar.Name)
 		dir := SidecarDir(l.baseDir, sidecar.Name)
 		err := os.MkdirAll(dir, os.ModePerm)
 		if err != nil {
 			return err
 		}
-		err = DownloadSidecar(dir, sidecar, forceDl)
+		isEmpty, err := IsEmptyDir(dir)
+		if err != nil {
+			return err
+		}
+		if !isEmpty && !forceDl {
+			entry.Infof("Skipping downloading from %s (directory not empty, sidecar must be already downloaded)", sidecar.ArtifactURL)
+			return nil
+		}
+		if !isEmpty {
+			err := os.RemoveAll(dir)
+			if err != nil {
+				return err
+			}
+			err = os.MkdirAll(dir, os.ModePerm)
+			if err != nil {
+				return err
+			}
+		}
+		err = DownloadSidecar(dir, sidecar)
 		if err != nil {
 			return err
 		}
@@ -117,8 +148,9 @@ func (l Launcher) DownloadArtifacts(forceDl bool) error {
 		if sidecar.AfterDownload == "" {
 			continue
 		}
-
-		entry := entryG.WithField("sidecar", sidecar.Name)
+		if runtime.GOOS == "windows" {
+			return nil
+		}
 		entry.Info("Run after install script ...")
 		cmd := exec.Command("bash", "-c", sidecar.AfterDownload)
 		cmd.Dir = filepath.Dir(l.sidecarExecPath(sidecar))
