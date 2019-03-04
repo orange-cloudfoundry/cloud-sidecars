@@ -91,7 +91,7 @@ sidecars:
   # It uses https://github.com/ArthurHlt/zipper for downloading artifacts this let you download git, zip, tar, tgz or any other file (they all be uncompressed)
   artifact_url: https://github.com/orange-cloudfoundry/gobis-server/releases/download/v1.6.1/gobis-server_linux_amd64.zip
   # force type detection for https://github.com/ArthurHlt/zipper
-  artifact_type: zip
+  artifact_type: http
   # Run script after downloading your artifact
   # here it renames gobis-server_linux_amd64 to gobis-server
   after_download: "mv * gobis-server"

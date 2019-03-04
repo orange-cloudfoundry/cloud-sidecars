@@ -21,8 +21,10 @@ import (
 var cliInterceptor *urfave.CliInterceptor
 var confFileIntercept *configfile.ConfigFileInterceptor
 
+const configFileName = "sidecars-config.yml"
+
 func init() {
-	os.Setenv(cloudenv.LOCAL_CONFIG_ENV_KEY, "sidecars-config.yml")
+	os.Setenv(cloudenv.LOCAL_CONFIG_ENV_KEY, configFileName)
 	confFileIntercept = configfile.NewConfigFile()
 	cliInterceptor = urfave.NewCli()
 	gautocloud.RegisterConnector(generic.NewConfigGenericConnector(
@@ -190,6 +192,9 @@ func retrieveConfig(c *cli.Context) (*config.SidecarsConfig, error) {
 	log.WithField("component", "cli").Debug("Loading configuration ...")
 	cliInterceptor.SetContext(c)
 	confPath := c.GlobalString("config-path")
+	if _, err := os.Stat(confPath); os.IsNotExist(err) {
+		confPath = filepath.Join(sidecars.PathSidecarsWd, configFileName)
+	}
 	confFileIntercept.SetConfigPath(confPath)
 
 	conf := &config.SidecarsConfig{}

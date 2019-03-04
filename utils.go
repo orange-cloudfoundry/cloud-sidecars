@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	pathSidecarsWd = ".sidecars"
+	PathSidecarsWd = ".sidecars"
 )
 
 func MergeEnv(old, new map[string]string) map[string]string {
@@ -46,5 +46,5 @@ func MapCast(m map[string]string) map[string]interface{} {
 }
 
 func SidecarDir(baseDir, sidecarName string) string {
-	return filepath.Join(baseDir, pathSidecarsWd, sidecarName)
+	return filepath.Join(baseDir, PathSidecarsWd, sidecarName)
 }
