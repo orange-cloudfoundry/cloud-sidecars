@@ -12,5 +12,6 @@ func main() {
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Error(err)
+		os.Exit(1)
 	}
 }

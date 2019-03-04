@@ -203,7 +203,11 @@ func retrieveConfig(c *cli.Context) (*config.SidecarsConfig, error) {
 	err := gautocloud.Inject(conf)
 	if _, ok := err.(loader.ErrGiveService); ok {
 		log.Warnf("Cannot found configuration from gautocloud, fallback to %s file", confPath)
-		b, err := ioutil.ReadFile(confPath)
+		var b []byte
+		b, err = ioutil.ReadFile(confPath)
+		if err != nil {
+			return nil, fmt.Errorf("configuration error, see previous message: %s", err.Error())
+		}
 		err = yaml.Unmarshal(b, conf)
 		if err != nil {
 			return nil, fmt.Errorf("configuration error, see previous message: %s", err.Error())
