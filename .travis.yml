@@ -1,0 +1,17 @@
+language: go
+go:
+  - "1.11"
+install:
+  - go get github.com/onsi/ginkgo/ginkgo
+  - go get github.com/onsi/gomega
+  - export GO111MODULE=on
+script:
+  - |
+    if [ "$(go fmt ./...)"]; then
+      echo "You need to run `go fmt`"
+      exit 1
+    fi
+  - go test ./... -v
+after_success:
+  - bin/build-all.sh
+
