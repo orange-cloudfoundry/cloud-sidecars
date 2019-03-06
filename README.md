@@ -50,12 +50,13 @@ USAGE:
    cloud-sidecars [global options] command [command options] [arguments...]
 
 VERSION:
-   dev
+   0.0.0
 
 COMMANDS:
      launch   launch all sidecar and main process, must be run as start command
      vendor   Vendor all sidecars in local for offline app
      setup    Download sidecars if needed and create profiled files, this should be run by a staging lifecycle (e.g.: cloud foundry buildpack lifecycle)
+     sha1     See sha1 corresponding to your artifacts
      help, h  Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
@@ -66,6 +67,7 @@ GLOBAL OPTIONS:
    --log-json, -j                 Write log in json
    --no-color                     Logger will not display colors
    --profile-dir value            Set path where to put profiled files
+   --app-port value               App listen port by default when not found from starter (default: 8080)
    --help, -h                     show help
    --version, -v                  print the version
 ```
@@ -79,6 +81,21 @@ You could use instead a cups service named `sidecar-config` for cloud foundry or
 Here the configuration file in `sidecars-config.yml` with exemple for [gobis-server]():
 
 ```yaml
+# Set to true to not use colors in logs output
+no_color: false
+# Set debug level (debug, info, warn, error level
+log_level: info
+# Set to true to show logs as json
+log_json: false
+# Set to true to not run app
+no_starter: false
+# Base directory to launch sidecars processes (where .sidecars directory is placed)
+# Cloud-sidecar cli will automatically found base dir by looking .sidecars directory in current wd or sub folders
+dir: "" 
+# App listen port by default when not found from starter
+# E.g.: during setup on cloud foundry env var PORT is not set but 
+# we need to know app port when using sidecar as reverse proxy
+app_port: 8080
 sidecars:
   # Name must be defined for your sidecar
 - name: gobis-server
@@ -89,9 +106,12 @@ sidecars:
   # executable path is prefixed directly with this path by cloud-sidecars
   # work dir for after_download is this directory: <dir>/.sidecars/<sidecar name>
   # It uses https://github.com/ArthurHlt/zipper for downloading artifacts this let you download git, zip, tar, tgz or any other file (they all be uncompressed)
-  artifact_url: https://github.com/orange-cloudfoundry/gobis-server/releases/download/v1.6.1/gobis-server_linux_amd64.zip
+  artifact_uri: https://github.com/orange-cloudfoundry/gobis-server/releases/download/v1.7.0/gobis-server_linux_amd64.zip
   # force type detection for https://github.com/ArthurHlt/zipper
   artifact_type: http
+  # Sha1 to ensure to have correct downloaded artifact
+  # This is specific sha1 made by zipper, use cloud-sidecars sha1 command to have sha1 to insert here
+  artifact_sha1: ""
   # Run script after downloading your artifact
   # here it renames gobis-server_linux_amd64 to gobis-server
   after_download: "mv * gobis-server"

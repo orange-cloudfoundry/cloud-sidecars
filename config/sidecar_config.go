@@ -10,15 +10,18 @@ type SidecarsConfig struct {
 	Sidecars  []*SidecarConfig `yaml:"sidecars" json:"sidecars"`
 	NoStarter bool             `yaml:"no_starter" json:"no_starter"`
 	LogLevel  string           `json:"log_level" yaml:"log_level"`
+	Dir       string           `json:"dir" yaml:"dir"`
 	LogJson   bool             `json:"log_json" yaml:"log_json"`
 	NoColor   bool             `json:"no_color" yaml:"no_color"`
+	AppPort   int              `json:"app_port" yaml:"app_port"`
 }
 
 type SidecarConfig struct {
 	Name                string            `yaml:"name" json:"name"`
 	Executable          string            `yaml:"executable" json:"executable"`
-	ArtifactURL         string            `yaml:"artifact_url" json:"artifact_url"`
+	ArtifactURI         string            `yaml:"artifact_uri" json:"artifact_uri"`
 	ArtifactType        string            `yaml:"artifact_type" json:"artifact_type"`
+	ArtifactSha1        string            `yaml:"artifact_sha1" json:"artifact_sha1"`
 	AfterDownload       string            `yaml:"after_download" json:"after_download"`
 	Args                []string          `yaml:"args" json:"args"`
 	Env                 map[string]string `yaml:"env" json:"env"`

@@ -1,6 +1,7 @@
 package sidecars
 
 import (
+	"fmt"
 	"github.com/ArthurHlt/zipper"
 	"github.com/orange-cloudfoundry/cloud-sidecars/config"
 	log "github.com/sirupsen/logrus"
@@ -11,25 +12,29 @@ import (
 
 func DownloadSidecar(dir string, c *config.SidecarConfig) error {
 	entry := log.WithField("component", "Downloader").WithField("sidecar", c.Name)
-	entry.Infof("Downloading from %s ...", c.ArtifactURL)
-	err := DownloadArtifact(dir, c.ArtifactURL, c.ArtifactType)
+	entry.Infof("Downloading from %s ...", c.ArtifactURI)
+	err := DownloadArtifact(dir, c.ArtifactURI, c.ArtifactType, c.ArtifactSha1)
 	if err != nil {
 		return err
 	}
-	entry.Infof("Finished downloading from %s ...", c.ArtifactURL)
+	entry.Infof("Finished downloading from %s ...", c.ArtifactURI)
 	return nil
 }
 
-func DownloadArtifact(dir, uri, fileType string) error {
-	var s *zipper.Session
-	var err error
-	if fileType != "" {
-		s, err = zipper.CreateSession(uri, fileType)
-	} else {
-		s, err = zipper.CreateSession(uri)
-	}
+func DownloadArtifact(dir, uri, fileType, sha1 string) error {
+	s, err := ZipperSess(uri, fileType)
 	if err != nil {
 		return err
+	}
+
+	if sha1 != "" {
+		isDiff, cSha1, err := s.IsDiff(sha1)
+		if err != nil {
+			return err
+		}
+		if isDiff {
+			return fmt.Errorf("Sha1 '%s' mismatch with current sha1 '%s'.", sha1, cSha1)
+		}
 	}
 
 	zipFile, err := s.Zip()
@@ -74,4 +79,16 @@ func IsEmptyDir(name string) (bool, error) {
 		return true, nil
 	}
 	return false, err // Either not empty or error, suits both cases
+}
+
+func DiffSha1(s *zipper.Session, storedSha1 string) bool {
+	isDiff, _, _ := s.IsDiff(storedSha1)
+	return isDiff
+}
+
+func ZipperSess(uri, fileType string) (*zipper.Session, error) {
+	if fileType != "" {
+		return zipper.CreateSession(uri, fileType)
+	}
+	return zipper.CreateSession(uri)
 }

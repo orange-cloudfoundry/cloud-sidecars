@@ -9,7 +9,6 @@ type Starter interface {
 	StartCmd(env []string, profileDir string, stdOut, stdErr io.Writer) (*exec.Cmd, error)
 	CloudEnvName() string
 	ProxyEnv(appPort int) map[string]string
-	ProxyProfile(appPort int) string
 	AppPort() int
 }
 

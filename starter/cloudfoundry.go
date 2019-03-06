@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/cloudfoundry-community/gautocloud"
 	"github.com/cloudfoundry-community/gautocloud/cloudenv"
+	"github.com/orange-cloudfoundry/cloud-sidecars/utils"
 	"gopkg.in/yaml.v2"
 	"io"
 	"io/ioutil"
@@ -27,7 +28,8 @@ func (s CloudFoundry) StartCmd(env []string, _ string, stdOut, stdErr io.Writer)
 	cmd := exec.Command(lPath, wd, s.getUserStartCommand(), "")
 	cmd.Env = env
 	cmd.Dir = filepath.Dir(wd)
-
+	// set pgid for sending signal to child
+	cmd.SysProcAttr = utils.PgidSysProcAttr()
 	cmd.Stdout = stdOut
 	cmd.Stderr = stdErr
 	return cmd, nil
@@ -73,23 +75,9 @@ func (CloudFoundry) AppPort() int {
 }
 
 func (s CloudFoundry) ProxyEnv(appPort int) map[string]string {
-	if appPort == s.AppPort() {
-		return make(map[string]string)
-	}
 	sPort := fmt.Sprintf("%d", appPort)
 	return map[string]string{
-		"PROXY_APP_PORT": sPort,
-		"PORT":           sPort,
-		"VCAP_APP_PORT":  sPort,
+		"PORT":          sPort,
+		"VCAP_APP_PORT": sPort,
 	}
-}
-
-func (s CloudFoundry) ProxyProfile(appPort int) string {
-	if appPort == s.AppPort() {
-		return ""
-	}
-	return fmt.Sprintf(`
-export PORT=%d
-export VCAP_APP_PORT=%d
-`, appPort, appPort)
 }

@@ -26,6 +26,7 @@ var confFileIntercept *configfile.ConfigFileInterceptor
 const configFileName = "sidecars-config.yml"
 
 func init() {
+	log.SetOutput(os.Stdout)
 	os.Setenv(cloudenv.LOCAL_CONFIG_ENV_KEY, configFileName)
 	confFileIntercept = configfile.NewConfigFile()
 	cliInterceptor = urfave.NewCli()
@@ -79,6 +80,11 @@ func NewApp(version string) *CloudSidecarApp {
 			Usage: "Set path where to put profiled files",
 			Value: "",
 		},
+		cli.IntFlag{
+			Name:  "app-port",
+			Usage: "App listen port by default when not found from starter",
+			Value: 8080,
+		},
 	}
 	app.Commands = []cli.Command{
 		{
@@ -108,8 +114,28 @@ func NewApp(version string) *CloudSidecarApp {
 			Usage:  "Download sidecars if needed and create profiled files, this should be run by a staging lifecycle (e.g.: cloud foundry buildpack lifecycle)",
 			Action: setupRun,
 		},
+		{
+			Name:   "sha1",
+			Usage:  "See sha1 corresponding to your artifacts",
+			Action: sha1Run,
+		},
 	}
 	return app
+}
+
+func sha1Run(c *cli.Context) error {
+	log.SetOutput(os.Stderr)
+	loadLogConfig(&config.SidecarsConfig{
+		LogJson:  c.GlobalBool("log-json"),
+		LogLevel: "ERROR",
+		NoColor:  c.GlobalBool("no-color"),
+	})
+	fmt.Fprint(os.Stderr, "Retrieving sha1 for all of your sidecars ...\n")
+	l, err := createLauncher(c, false)
+	if err != nil {
+		return err
+	}
+	return l.ShowSidecarsSha1()
 }
 
 func setupRun(c *cli.Context) error {
@@ -181,8 +207,8 @@ func createLauncher(c *cli.Context, failWhenNoStarter bool) (*sidecars.Launcher,
 		}
 		entry.Debug("Finished loading starter.")
 	}
-
-	l := sidecars.NewLauncher(*conf, cStarter, baseDir, profileDir, os.Stdout, os.Stderr)
+	defaultPort := c.GlobalInt("app-port")
+	l := sidecars.NewLauncher(*conf, cStarter, profileDir, os.Stdout, os.Stderr, defaultPort)
 	entry.Debug("Finished creating launcher.")
 	return l, nil
 }
@@ -193,10 +219,7 @@ func retrieveConfig(c *cli.Context) (*config.SidecarsConfig, error) {
 
 	log.WithField("component", "cli").Debug("Loading configuration ...")
 	cliInterceptor.SetContext(c)
-	confPath := c.GlobalString("config-path")
-	if _, err := os.Stat(confPath); os.IsNotExist(err) {
-		confPath = filepath.Join(sidecars.PathSidecarsWd, configFileName)
-	}
+	confPath, baseDir := findConfPathAndDir(c)
 	confFileIntercept.SetConfigPath(confPath)
 
 	conf := &config.SidecarsConfig{}
@@ -206,15 +229,55 @@ func retrieveConfig(c *cli.Context) (*config.SidecarsConfig, error) {
 		var b []byte
 		b, err = ioutil.ReadFile(confPath)
 		if err != nil {
-			return nil, fmt.Errorf("configuration error, see previous message: %s", err.Error())
+			return nil, fmt.Errorf("configuration loading from %s error: %s", confPath, err.Error())
 		}
 		err = yaml.Unmarshal(b, conf)
 		if err != nil {
-			return nil, fmt.Errorf("configuration error, see previous message: %s", err.Error())
+			return nil, fmt.Errorf("configuration loading from %s error: %s", confPath, err.Error())
 		}
 	}
+	conf.Dir = baseDir
 	log.WithField("component", "cli").Debug("Finished loading configuration.")
 	return conf, err
+}
+
+func findConfPathAndDir(c *cli.Context) (confPath string, dir string) {
+	dir = c.GlobalString("dir")
+	if dir == "" {
+		dir, _ = os.Getwd()
+	}
+	confPath = filepath.Join(dir, c.GlobalString("config-path"))
+	if _, err := os.Stat(confPath); os.IsNotExist(err) {
+		confPath = filepath.Join(dir, sidecars.PathSidecarsWd, configFileName)
+		log.Warnf(
+			"Config file not found on %s, trying to find config file at %s .",
+			c.GlobalString("config-path"),
+			confPath,
+		)
+	}
+	if _, err := os.Stat(confPath); os.IsNotExist(err) {
+		log.Warnf(
+			"Config file not found on %s, trying to auto-find on first sub folder .",
+			confPath,
+		)
+		files, err := ioutil.ReadDir(dir)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, file := range files {
+			if !file.IsDir() {
+				continue
+			}
+			tmpConfPath := filepath.Join(dir, file.Name(), sidecars.PathSidecarsWd, configFileName)
+			if _, err := os.Stat(tmpConfPath); err == nil {
+				confPath = tmpConfPath
+				dir = filepath.Join(dir, file.Name())
+				log.Warnf("Config file found at %s", confPath)
+			}
+		}
+
+	}
+	return
 }
 
 func loadLogConfig(c *config.SidecarsConfig) {
