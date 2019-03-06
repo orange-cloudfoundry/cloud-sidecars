@@ -124,7 +124,9 @@ sidecars:
   - "${PROXY_APP_PORT}"
   # Set env var for sidecar
   # you can give a value in posix style from env var
-  env: {}
+  env:
+    FOO: "${PATH}"
+    KEY: "val"
   # Set env var for app, all app_env found in sidecars will be merged in one
   # you can give a value in posix style from env var
   app_env: {}
