@@ -45,12 +45,17 @@ func MapCast(m map[string]string) map[string]interface{} {
 	return mI
 }
 
-func PgidSysProcAttr() *syscall.SysProcAttr {
-	attr := &syscall.SysProcAttr{}
+func PgidSysProcAttr(attrOrig *syscall.SysProcAttr) *syscall.SysProcAttr {
+	var attr *syscall.SysProcAttr
+	if attrOrig != nil {
+		attr = attrOrig
+	} else {
+		attr = &syscall.SysProcAttr{}
+	}
 	val := reflect.ValueOf(attr).Elem()
 	valSetpgid := val.FieldByName("Setpgid")
 	if valSetpgid == (reflect.Value{}) || valSetpgid.Kind() != reflect.Bool {
-		return nil
+		return attrOrig
 	}
 	valSetpgid.SetBool(true)
 	return attr

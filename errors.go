@@ -6,11 +6,11 @@ import (
 )
 
 type sidecarError struct {
-	s   *config.SidecarConfig
+	s   *config.Sidecar
 	err error
 }
 
-func NewSidecarError(s *config.SidecarConfig, err error) *sidecarError {
+func NewSidecarError(s *config.Sidecar, err error) *sidecarError {
 	return &sidecarError{s, err}
 }
 

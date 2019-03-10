@@ -31,7 +31,7 @@ func init() {
 	confFileIntercept = configfile.NewConfigFile()
 	cliInterceptor = urfave.NewCli()
 	gautocloud.RegisterConnector(generic.NewConfigGenericConnector(
-		config.SidecarsConfig{},
+		config.Sidecars{},
 		confFileIntercept,
 		cliInterceptor,
 	))
@@ -113,6 +113,12 @@ func NewApp(version string) *CloudSidecarApp {
 			Name:   "setup",
 			Usage:  "Download sidecars if needed and create profiled files, this should be run by a staging lifecycle (e.g.: cloud foundry buildpack lifecycle)",
 			Action: setupRun,
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "force, f",
+					Usage: "Force downloading even if files are found for sidecar",
+				},
+			},
 		},
 		{
 			Name:   "sha1",
@@ -125,7 +131,7 @@ func NewApp(version string) *CloudSidecarApp {
 
 func sha1Run(c *cli.Context) error {
 	log.SetOutput(os.Stderr)
-	loadLogConfig(&config.SidecarsConfig{
+	loadLogConfig(&config.Sidecars{
 		LogJson:  c.GlobalBool("log-json"),
 		LogLevel: "ERROR",
 		NoColor:  c.GlobalBool("no-color"),
@@ -144,7 +150,7 @@ func setupRun(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	return l.Setup()
+	return l.Setup(c.Bool("force"))
 }
 
 func launchRun(c *cli.Context) error {
@@ -166,7 +172,7 @@ func vendorRun(c *cli.Context) error {
 }
 
 func initApp(c *cli.Context) {
-	loadLogConfig(&config.SidecarsConfig{
+	loadLogConfig(&config.Sidecars{
 		LogJson:  c.GlobalBool("log-json"),
 		LogLevel: c.GlobalString("log-level"),
 		NoColor:  c.GlobalBool("no-color"),
@@ -213,7 +219,7 @@ func createLauncher(c *cli.Context, failWhenNoStarter bool) (*sidecars.Launcher,
 	return l, nil
 }
 
-func retrieveConfig(c *cli.Context) (*config.SidecarsConfig, error) {
+func retrieveConfig(c *cli.Context) (*config.Sidecars, error) {
 	// Has been modified in init, reset it after loading config for possible env var usage in sidecars
 	defer os.Unsetenv(cloudenv.LOCAL_CONFIG_ENV_KEY)
 
@@ -222,7 +228,7 @@ func retrieveConfig(c *cli.Context) (*config.SidecarsConfig, error) {
 	confPath, baseDir := findConfPathAndDir(c)
 	confFileIntercept.SetConfigPath(confPath)
 
-	conf := &config.SidecarsConfig{}
+	conf := &config.Sidecars{}
 	err := gautocloud.Inject(conf)
 	if _, ok := err.(loader.ErrGiveService); ok {
 		log.Warnf("Cannot found configuration from gautocloud, fallback to %s file", confPath)
@@ -280,7 +286,7 @@ func findConfPathAndDir(c *cli.Context) (confPath string, dir string) {
 	return
 }
 
-func loadLogConfig(c *config.SidecarsConfig) {
+func loadLogConfig(c *config.Sidecars) {
 	if c.LogJson {
 		log.SetFormatter(&log.JSONFormatter{})
 	} else {

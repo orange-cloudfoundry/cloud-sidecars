@@ -10,7 +10,7 @@ import (
 	"os"
 )
 
-func DownloadSidecar(dir string, c *config.SidecarConfig) error {
+func DownloadSidecar(dir string, c *config.Sidecar) error {
 	entry := log.WithField("component", "Downloader").WithField("sidecar", c.Name)
 	entry.Infof("Downloading from %s ...", c.ArtifactURI)
 	err := DownloadArtifact(dir, c.ArtifactURI, c.ArtifactType, c.ArtifactSha1)

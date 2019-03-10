@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/cloudfoundry-community/gautocloud"
 	"github.com/cloudfoundry-community/gautocloud/cloudenv"
-	"github.com/orange-cloudfoundry/cloud-sidecars/utils"
 	"gopkg.in/yaml.v2"
 	"io"
 	"io/ioutil"
@@ -28,8 +27,6 @@ func (s CloudFoundry) StartCmd(env []string, _ string, stdOut, stdErr io.Writer)
 	cmd := exec.Command(lPath, wd, s.getUserStartCommand(), "")
 	cmd.Env = env
 	cmd.Dir = filepath.Dir(wd)
-	// set pgid for sending signal to child
-	cmd.SysProcAttr = utils.PgidSysProcAttr()
 	cmd.Stdout = stdOut
 	cmd.Stderr = stdErr
 	return cmd, nil

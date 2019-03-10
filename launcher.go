@@ -12,10 +12,8 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"sync"
 	"syscall"
@@ -33,7 +31,7 @@ const (
 )
 
 type Launcher struct {
-	sConfig    config.SidecarsConfig
+	sConfig    config.Sidecars
 	cStarter   starter.Starter
 	profileDir string
 	stdout     io.Writer
@@ -42,7 +40,7 @@ type Launcher struct {
 }
 
 func NewLauncher(
-	sConfig config.SidecarsConfig,
+	sConfig config.Sidecars,
 	cStarter starter.Starter,
 	profileDir string,
 	stdout, stderr io.Writer,
@@ -90,7 +88,7 @@ func (l Launcher) ShowSidecarsSha1() error {
 	return nil
 }
 
-func (l Launcher) Setup() error {
+func (l Launcher) Setup(force bool) error {
 	entryG := log.WithField("component", "Launcher").WithField("command", "staging")
 	entryG.Infof("Setup sidecars ...")
 	appEnv := make(map[string]string)
@@ -98,29 +96,26 @@ func (l Launcher) Setup() error {
 	if err != nil {
 		return err
 	}
+	err = l.DownloadArtifacts(force)
+	if err != nil {
+		return err
+	}
 	appPort := l.appPort
-	for _, sidecar := range l.sConfig.Sidecars {
+	for index, sidecar := range l.sConfig.Sidecars {
 		entry := entryG.WithField("sidecar", sidecar.Name)
 		entry.Infof("Setup ...")
-		appEnvUnTpl, err := l.templatingEnv(appEnv, sidecar.AppEnv)
+		appEnvUnTpl, err := TemplatingEnv(appEnv, sidecar.AppEnv)
 		if err != nil {
 			return err
 		}
 		appEnv = utils.MergeEnv(appEnv, appEnvUnTpl)
-		if sidecar.ArtifactURI == "" {
-			continue
-		}
 		if sidecar.IsRproxy {
 			appPort++
-		}
-		err = l.DownloadArtifacts(false)
-		if err != nil {
-			return err
 		}
 		if sidecar.ProfileD != "" {
 			entry.Infof("Writing profiled file ...")
 			err := ioutil.WriteFile(
-				filepath.Join(l.profileDir, sidecar.Name+".sh"),
+				filepath.Join(l.profileDir, fmt.Sprintf("%d_%s.sh", index+1, sidecar.Name)),
 				[]byte(sidecar.ProfileD), 0755)
 			if err != nil {
 				return err
@@ -146,7 +141,7 @@ func (l Launcher) Setup() error {
 		profileLaunch += fmt.Sprintf("export %s=%s\n", k, shellescape.Quote(v))
 	}
 	err = ioutil.WriteFile(
-		filepath.Join(l.profileDir, "starter.sh"),
+		filepath.Join(l.profileDir, "0_starter.sh"),
 		[]byte(profileLaunch), 0755)
 	if err != nil {
 		return err
@@ -194,23 +189,18 @@ func (l Launcher) DownloadArtifacts(forceDl bool) error {
 		if sidecar.AfterDownload == "" {
 			continue
 		}
-		if runtime.GOOS == "windows" {
-			return nil
-		}
+
 		entry.Info("Run after install script ...")
-		cmd := exec.Command("bash", "-c", sidecar.AfterDownload)
-		cmd.Dir = filepath.Dir(l.sidecarExecPath(sidecar))
-		env, err := l.overrideEnv(utils.OsEnvToMap(), sidecar.Env)
+		env, err := OverrideEnv(utils.OsEnvToMap(), sidecar.Env)
 		if err != nil {
 			return NewSidecarError(sidecar, err)
 		}
-		cmd.Env = utils.EnvMapToOsEnv(env)
-		cmd.Stdout = l.stdout
-		cmd.Stderr = l.stderr
-		if err != nil {
-			return NewSidecarError(sidecar, err)
-		}
-		err = cmd.Run()
+		err = runScript(
+			sidecar.AfterDownload,
+			filepath.Dir(SidecarExecPath(l.sConfig.Dir, sidecar)),
+			utils.EnvMapToOsEnv(env),
+			l.stdout, l.stderr,
+		)
 		if err != nil {
 			return NewSidecarError(sidecar, err)
 		}
@@ -225,50 +215,26 @@ func (l Launcher) Launch() error {
 		WithField("command", "launch")
 	appEnv := utils.OsEnvToMap()
 
-	var wg sync.WaitGroup
+	wg := &sync.WaitGroup{}
 	processLen := len(l.sConfig.Sidecars)
 	if !l.sConfig.NoStarter {
 		processLen++
 	}
 	wg.Add(processLen)
 
-	processes := make([]*exec.Cmd, processLen)
+	processes := make([]*process, processLen)
 	pProcesses := &processes
 
 	errChan := make(chan error, 100)
 	signalChan := make(chan os.Signal, 100)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
 
-	// manage graceful shutdown
-	go func() {
-		sig := <-signalChan
-		// If signal has been set by other process at init we are waiting
-		// to reach number of process required before sending back signal
-		for !processesNotHaveLen(*pProcesses, processLen) {
-			time.Sleep(10 * time.Millisecond)
-		}
-		for _, process := range *pProcesses {
-			if process.Process == nil {
-				continue // process is not running (which probably create signal)
-			}
-			// resent signal for each process to make them detect
-			// when they receive a signal to not show error
-			signalChan <- sig
-			// if setpgid exist in sysproc, we need to send signal to negative pid (-pid)
-			// we override pid value to let us use process.Process.Signal
-			// instead of non os agnostic syscall funcs
-			if utils.HasPgidSysProcAttr(process.SysProcAttr) {
-				process.Process.Pid = -process.Process.Pid
-			}
-			process.Process.Signal(sig)
-		}
-		// if processes still doesn't stop after 20 sec we force shutdown
-		time.Sleep(20 * time.Second)
-		for _, process := range *pProcesses {
-			signalChan <- syscall.SIGKILL
-			process.Process.Kill()
-		}
-	}()
+	var cStarter starter.Starter = nil
+	if !l.sConfig.NoStarter {
+		cStarter = l.cStarter
+	}
+	factory := NewProcessFactory(errChan, signalChan, wg, l.stdout, l.stderr, cStarter, l.sConfig.Dir)
+
 	var err error
 	i := 0
 	appPort := l.appPort
@@ -279,19 +245,19 @@ func (l Launcher) Launch() error {
 		}
 	}
 	for _, sidecar := range l.sConfig.Sidecars {
-		env, err := l.overrideEnv(utils.OsEnvToMap(), sidecar.Env)
+		env, err := OverrideEnv(utils.OsEnvToMap(), sidecar.Env)
 		if err != nil {
 			return NewSidecarError(sidecar, err)
 		}
 		if sidecar.IsRproxy {
 			if l.cStarter != nil && !l.sConfig.NoStarter {
-				env, err = l.overrideEnv(env, l.cStarter.ProxyEnv(appPort))
+				env, err = OverrideEnv(env, l.cStarter.ProxyEnv(appPort))
 				if err != nil {
 					return NewSidecarError(sidecar, err)
 				}
 			}
 			appPort++
-			env, err = l.overrideEnv(env, map[string]string{
+			env, err = OverrideEnv(env, map[string]string{
 				ProxyAppPortEnvKey: fmt.Sprintf("%d", appPort),
 			})
 			if err != nil {
@@ -299,80 +265,40 @@ func (l Launcher) Launch() error {
 			}
 		}
 		entry := entryG.WithField("sidecar", sidecar.Name)
-		entry.Info("Starting sidecar ...")
-		appEnvUnTpl, err := l.templatingEnv(appEnv, sidecar.AppEnv)
+		entry.Debug("Setup sidecar ...")
+		appEnvUnTpl, err := TemplatingEnv(appEnv, sidecar.AppEnv)
 		if err != nil {
 			return NewSidecarError(sidecar, err)
 		}
 		appEnv = utils.MergeEnv(appEnv, appEnvUnTpl)
-		cmd, err := l.cmdSidecar(sidecar, env)
+		processes[i], err = factory.FromSidecar(sidecar, env)
 		if err != nil {
 			return NewSidecarError(sidecar, err)
 		}
-		processes[i] = cmd
 		i++
-		go func() {
-			defer wg.Done()
-			err := cmd.Run()
-			if err != nil {
-				select {
-				case <-signalChan:
-					return
-				default:
-				}
-				errMess := fmt.Sprintf("Error occurred on sidecar %s: %s", sidecar.Name, err.Error())
-				entry.Error(errMess)
-				if !sidecar.NoInterruptWhenStop {
-					errChan <- fmt.Errorf(errMess)
-					signalChan <- syscall.SIGINT
-				}
-			}
-		}()
-		entry.Info("Sidecar has started")
+
+		entry.Debug("Finished setup sidecar.")
 	}
 
-	if l.sConfig.NoStarter {
-		wg.Wait()
-		select {
-		case err := <-errChan:
-			return err
-		default:
-			return nil
+	// manage graceful shutdown
+	go l.handlingSignal(pProcesses, processLen, signalChan)
+
+	if !l.sConfig.NoStarter {
+		entryS := entryG.WithField("starter", l.cStarter.CloudEnvName())
+		if appPort != l.appPort {
+			appEnv = utils.MergeEnv(appEnv, l.cStarter.ProxyEnv(appPort))
 		}
-	}
-	entryS := entryG.WithField("starter", l.cStarter.CloudEnvName())
-	if appPort != l.appPort {
-		appEnv = utils.MergeEnv(appEnv, l.cStarter.ProxyEnv(appPort))
-	}
-	entryS.Info("Running cloud starter ...")
-	cloudCmd, err := l.cStarter.StartCmd(
-		utils.EnvMapToOsEnv(appEnv),
-		l.profileDir,
-		l.stdout,
-		l.stderr,
-	)
-	if err != nil {
-		return err
-	}
-	processes[i] = cloudCmd
-
-	go func() {
-		defer wg.Done()
-		err := cloudCmd.Run()
+		entryS.Debug("Setup cloud starter ...")
+		processes[i], err = factory.FromStarter(appEnv, l.profileDir)
 		if err != nil {
-			select {
-			case <-signalChan:
-				return
-			default:
-			}
-			errMess := fmt.Sprintf("Error occurred on cloud Launcher: %s", err.Error())
-			entryS.Error(errMess)
-			errChan <- fmt.Errorf(errMess)
+			return err
 		}
-		// if main real process stopped we should stop all other processes
-		signalChan <- syscall.SIGINT
-	}()
+		entryS.Debug("Finished setup cloud starter ...")
+	}
 
+	for _, p := range processes {
+		go p.Start()
+	}
 	wg.Wait()
 	select {
 	case err = <-errChan:
@@ -383,101 +309,43 @@ func (l Launcher) Launch() error {
 	return nil
 }
 
-func (l Launcher) overrideEnv(old, new map[string]string) (map[string]string, error) {
-	newUnTpl, err := l.templatingEnv(old, new)
-	if err != nil {
-		return map[string]string{}, err
+func (l Launcher) handlingSignal(pProcesses *[]*process, processLen int, signalChan chan os.Signal) {
+	sig := <-signalChan
+	// If signal has been set by other process at init we are waiting
+	// to reach number of process required before sending back signal
+	for !processesNotHaveLen(*pProcesses, processLen) {
+		time.Sleep(10 * time.Millisecond)
 	}
-	return utils.MergeEnv(old, newUnTpl), nil
-}
-
-func (l Launcher) templatingEnv(old, new map[string]string) (map[string]string, error) {
-	for k, v := range new {
-		newV, err := l.templatingFromEnv(old, v)
-		if err != nil {
-			return new, err
+	for _, process := range *pProcesses {
+		if process.cmd.Process == nil {
+			continue // process is not running (which probably create signal)
 		}
-		new[k] = newV
-	}
-	return new, nil
-}
-
-func (l Launcher) templatingArgs(env map[string]string, args ...string) ([]string, error) {
-	var err error
-	for i, arg := range args {
-		args[i], err = l.templatingFromEnv(env, arg)
-		if err != nil {
-			return args, err
+		// resent signal for each process to make them detect
+		// when they receive a signal to not show error
+		signalChan <- sig
+		// if setpgid exist in sysproc, we need to send signal to negative pid (-pid)
+		// we override pid value to let us use process.Process.Signal
+		// instead of non os agnostic syscall funcs
+		if utils.HasPgidSysProcAttr(process.cmd.SysProcAttr) {
+			process.cmd.Process.Pid = -process.cmd.Process.Pid
 		}
+		process.cmd.Process.Signal(sig)
 	}
-	return args, nil
-}
-
-func (l Launcher) templatingFromEnv(env map[string]string, s string) (string, error) {
-	// sigil allow $ENV_VAR in templating
-	buf, err := sigil.Execute([]byte(s), utils.MapCast(env), "env-tpl")
-	if err != nil {
-		return "", err
+	// if processes still doesn't stop after 20 sec we force shutdown
+	time.Sleep(20 * time.Second)
+	for _, process := range *pProcesses {
+		signalChan <- syscall.SIGKILL
+		process.cmd.Process.Kill()
 	}
-	return buf.String(), nil
-}
-
-func (l Launcher) sidecarExecPath(sidecar *config.SidecarConfig) string {
-	execPath := sidecar.Executable
-	wd := l.sConfig.Dir
-	if wd == "" {
-		wd, _ = os.Getwd()
-	}
-	if sidecar.ArtifactURI != "" {
-		execPath = filepath.Join(SidecarDir(wd, sidecar.Name), execPath)
-	}
-	return execPath
-}
-
-func (l Launcher) cmdSidecar(sidecar *config.SidecarConfig, env map[string]string) (*exec.Cmd, error) {
-	var err error
-	wd := l.sConfig.Dir
-	if sidecar.WorkDir != "" {
-		wd = sidecar.WorkDir
-	}
-	if wd == "" {
-		wd, _ = os.Getwd()
-	}
-
-	if _, err := os.Stat(wd); os.IsNotExist(err) {
-		return nil, fmt.Errorf("Workdir '%s' doesn't exists.", wd)
-	}
-
-	args, err := l.templatingArgs(env, sidecar.Args...)
-	if err != nil {
-		return nil, err
-	}
-	cmd := exec.Command(l.sidecarExecPath(sidecar), args...)
-	cmd.Env = utils.EnvMapToOsEnv(env)
-	cmd.Dir = wd
-	// set pgid for sending signal to child
-	cmd.SysProcAttr = utils.PgidSysProcAttr()
-	if !sidecar.NoLogPrefix {
-		writerPrefix := fmt.Sprintf("[sidecar:%s]", sidecar.Name)
-		err := PrefixCmdOutput(l.stdout, l.stderr, cmd, writerPrefix)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		cmd.Stdout = l.stdout
-		cmd.Stderr = l.stderr
-	}
-
-	return cmd, nil
 }
 
 func SidecarDir(baseDir, sidecarName string) string {
 	return filepath.Join(baseDir, PathSidecarsWd, sidecarName)
 }
 
-func processesNotHaveLen(processes []*exec.Cmd, len int) bool {
+func processesNotHaveLen(processes []*process, len int) bool {
 	var i int
-	var p *exec.Cmd
+	var p *process
 	for i, p = range processes {
 		if p == nil {
 			break
