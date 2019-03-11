@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	launcherName string = "launcher"
-	procFile     string = "Procfile"
+	cfLauncherName string = "launcher"
+	procFile       string = "Procfile"
 )
 
 type CloudFoundry struct {
@@ -32,8 +32,12 @@ func (s CloudFoundry) StartCmd(env []string, _ string, stdOut, stdErr io.Writer)
 	return cmd, nil
 }
 
-func (s CloudFoundry) CloudEnvName() string {
+func (s CloudFoundry) Name() string {
 	return cloudenv.CfCloudEnv{}.Name()
+}
+
+func (s CloudFoundry) Detect() bool {
+	return s.Name() == gautocloud.CurrentCloudEnv().Name()
 }
 
 func (CloudFoundry) getUserStartCommand() string {
@@ -52,7 +56,7 @@ func (CloudFoundry) getUserStartCommand() string {
 }
 
 func (CloudFoundry) launcherPath() string {
-	lName := launcherName
+	lName := cfLauncherName
 	base := "/tmp"
 	if runtime.GOOS == "windows" {
 		base = "C:\\tmp"

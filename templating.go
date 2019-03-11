@@ -5,6 +5,10 @@ import (
 	"github.com/orange-cloudfoundry/cloud-sidecars/utils"
 )
 
+func init() {
+	sigil.PosixPreprocess = true
+}
+
 func OverrideEnv(old, new map[string]string) (map[string]string, error) {
 	newUnTpl, err := TemplatingEnv(old, new)
 	if err != nil {

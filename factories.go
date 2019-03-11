@@ -23,20 +23,30 @@ type ProcessFactory struct {
 }
 
 func NewProcessFactory(
-	errChan chan error, signalChan chan os.Signal,
-	wg *sync.WaitGroup,
 	stdout, stderr io.Writer,
 	cStarter starter.Starter,
 	wd string) *ProcessFactory {
 	return &ProcessFactory{
-		errChan:    errChan,
-		signalChan: signalChan,
-		wg:         wg,
+		errChan:    make(chan error, 100),
+		signalChan: make(chan os.Signal, 100),
+		wg:         &sync.WaitGroup{},
 		stderr:     stderr,
 		stdout:     stdout,
 		wd:         wd,
 		cStarter:   cStarter,
 	}
+}
+
+func (f *ProcessFactory) WaitGroup() *sync.WaitGroup {
+	return f.wg
+}
+
+func (f *ProcessFactory) ErrorChan() chan error {
+	return f.errChan
+}
+
+func (f *ProcessFactory) SignalChan() chan os.Signal {
+	return f.signalChan
 }
 
 func (f *ProcessFactory) FromStarter(env map[string]string, profileDir string) (*process, error) {

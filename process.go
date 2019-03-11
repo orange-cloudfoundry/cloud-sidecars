@@ -26,6 +26,7 @@ func (p *process) Start() {
 	defer p.wg.Done()
 	err := p.cmd.Run()
 	if err != nil {
+		// if this come from a signal, we do not considered this as an error
 		select {
 		case <-p.signalChan:
 			return

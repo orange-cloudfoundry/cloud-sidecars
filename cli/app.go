@@ -198,18 +198,25 @@ func createLauncher(c *cli.Context, failWhenNoStarter bool) (*sidecars.Launcher,
 
 	if !c.Bool("no-starter") {
 		entry.Debug("Loading starter ...")
-		sidecarEnv := gautocloud.CurrentCloudEnv().Name()
-		if c.GlobalString("cloud-env") != "" {
-			sidecarEnv = c.GlobalString("cloud-env")
-		}
+		sidecarEnv := c.GlobalString("cloud-env")
 		for _, s := range starter.Retrieve() {
-			if s.CloudEnvName() == sidecarEnv {
-				log.Infof("Starter for %s is loading", s.CloudEnvName())
+			if s.Name() == sidecarEnv {
+				log.Infof("Starter for %s is loading", s.Name())
 				cStarter = s
+				break
+			}
+			if s.Detect() && sidecarEnv == "" {
+				log.Infof("Starter for %s is loading", s.Name())
+				cStarter = s
+				break
 			}
 		}
 		if cStarter == nil && failWhenNoStarter {
-			return nil, fmt.Errorf("Could not found starter for ")
+			details := ""
+			if sidecarEnv != "" {
+				details = fmt.Sprintf("for cloud-env %s", sidecarEnv)
+			}
+			return nil, fmt.Errorf("Could not found starter %s", details)
 		}
 		entry.Debug("Finished loading starter.")
 	}

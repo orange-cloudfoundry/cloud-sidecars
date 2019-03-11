@@ -2,7 +2,6 @@ package sidecars
 
 import (
 	"fmt"
-	"github.com/gliderlabs/sigil"
 	"github.com/olekukonko/tablewriter"
 	"github.com/orange-cloudfoundry/cloud-sidecars/config"
 	"github.com/orange-cloudfoundry/cloud-sidecars/starter"
@@ -15,14 +14,9 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
-	"sync"
 	"syscall"
 	"time"
 )
-
-func init() {
-	sigil.PosixPreprocess = true
-}
 
 const (
 	ProxyAppPortEnvKey = "PROXY_APP_PORT"
@@ -31,12 +25,13 @@ const (
 )
 
 type Launcher struct {
-	sConfig    config.Sidecars
-	cStarter   starter.Starter
-	profileDir string
-	stdout     io.Writer
-	stderr     io.Writer
-	appPort    int
+	sConfig        config.Sidecars
+	cStarter       starter.Starter
+	profileDir     string
+	stdout         io.Writer
+	stderr         io.Writer
+	appPort        int
+	processFactory *ProcessFactory
 }
 
 func NewLauncher(
@@ -57,12 +52,13 @@ func NewLauncher(
 		appPort = defaultAppPort
 	}
 	return &Launcher{
-		sConfig:    sConfig,
-		cStarter:   cStarter,
-		profileDir: profileDir,
-		stdout:     stdout,
-		stderr:     stderr,
-		appPort:    appPort,
+		sConfig:        sConfig,
+		cStarter:       cStarter,
+		profileDir:     profileDir,
+		stdout:         stdout,
+		stderr:         stderr,
+		appPort:        appPort,
+		processFactory: NewProcessFactory(stdout, stderr, cStarter, sConfig.Dir),
 	}
 }
 
@@ -113,14 +109,15 @@ func (l Launcher) Setup(force bool) error {
 			appPort++
 		}
 		if sidecar.ProfileD != "" {
-			entry.Infof("Writing profiled file ...")
+			fileName := fmt.Sprintf("%d_%s.sh", index+1, sidecar.Name)
+			entry.Infof("Writing profiled file '%s' ...", fileName)
 			err := ioutil.WriteFile(
-				filepath.Join(l.profileDir, fmt.Sprintf("%d_%s.sh", index+1, sidecar.Name)),
+				filepath.Join(l.profileDir, fileName),
 				[]byte(sidecar.ProfileD), 0755)
 			if err != nil {
 				return err
 			}
-			entry.Infof("Finished writing profiled file.")
+			entry.Infof("Finished writing profiled file '%s' .", fileName)
 		}
 
 		entry.Infof("Finished setup.")
@@ -135,7 +132,7 @@ func (l Launcher) Setup(force bool) error {
 			AppPortEnvKey: strconv.Itoa(l.appPort),
 		})
 	}
-	entryG.WithField("starter", l.cStarter.CloudEnvName()).Info("Adding starter.sh profile")
+	entryG.WithField("starter", l.cStarter.Name()).Info("Adding starter.sh profile")
 	profileLaunch := ""
 	for k, v := range appEnv {
 		profileLaunch += fmt.Sprintf("export %s=%s\n", k, shellescape.Quote(v))
@@ -146,7 +143,7 @@ func (l Launcher) Setup(force bool) error {
 	if err != nil {
 		return err
 	}
-	entryG.WithField("starter", l.cStarter.CloudEnvName()).Info("Finished adding starter.sh profile")
+	entryG.WithField("starter", l.cStarter.Name()).Info("Finished adding starter.sh profile")
 	return nil
 }
 
@@ -211,90 +208,30 @@ func (l Launcher) DownloadArtifacts(forceDl bool) error {
 }
 
 func (l Launcher) Launch() error {
-	entryG := log.WithField("component", "Launcher").
+	entry := log.WithField("component", "Launcher").
 		WithField("command", "launch")
-	appEnv := utils.OsEnvToMap()
 
-	wg := &sync.WaitGroup{}
+	wg := l.processFactory.WaitGroup()
 	processLen := len(l.sConfig.Sidecars)
 	if !l.sConfig.NoStarter {
 		processLen++
 	}
-	wg.Add(processLen)
+	entry.Info("Creating all processes ...")
+	processLen, processes, err := l.CreateProcesses()
+	if err != nil {
+		return err
+	}
+	entry.Info("Finished creating all processes ...")
 
-	processes := make([]*process, processLen)
+	wg.Add(processLen)
 	pProcesses := &processes
 
-	errChan := make(chan error, 100)
-	signalChan := make(chan os.Signal, 100)
+	signalChan := l.processFactory.SignalChan()
+	errChan := l.processFactory.ErrorChan()
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
-
-	var cStarter starter.Starter = nil
-	if !l.sConfig.NoStarter {
-		cStarter = l.cStarter
-	}
-	factory := NewProcessFactory(errChan, signalChan, wg, l.stdout, l.stderr, cStarter, l.sConfig.Dir)
-
-	var err error
-	i := 0
-	appPort := l.appPort
-	if os.Getenv(AppPortEnvKey) != "" {
-		appPort, err = strconv.Atoi(os.Getenv(AppPortEnvKey))
-		if err != nil {
-			return err
-		}
-	}
-	for _, sidecar := range l.sConfig.Sidecars {
-		env, err := OverrideEnv(utils.OsEnvToMap(), sidecar.Env)
-		if err != nil {
-			return NewSidecarError(sidecar, err)
-		}
-		if sidecar.IsRproxy {
-			if l.cStarter != nil && !l.sConfig.NoStarter {
-				env, err = OverrideEnv(env, l.cStarter.ProxyEnv(appPort))
-				if err != nil {
-					return NewSidecarError(sidecar, err)
-				}
-			}
-			appPort++
-			env, err = OverrideEnv(env, map[string]string{
-				ProxyAppPortEnvKey: fmt.Sprintf("%d", appPort),
-			})
-			if err != nil {
-				return NewSidecarError(sidecar, err)
-			}
-		}
-		entry := entryG.WithField("sidecar", sidecar.Name)
-		entry.Debug("Setup sidecar ...")
-		appEnvUnTpl, err := TemplatingEnv(appEnv, sidecar.AppEnv)
-		if err != nil {
-			return NewSidecarError(sidecar, err)
-		}
-		appEnv = utils.MergeEnv(appEnv, appEnvUnTpl)
-		processes[i], err = factory.FromSidecar(sidecar, env)
-		if err != nil {
-			return NewSidecarError(sidecar, err)
-		}
-		i++
-
-		entry.Debug("Finished setup sidecar.")
-	}
 
 	// manage graceful shutdown
 	go l.handlingSignal(pProcesses, processLen, signalChan)
-
-	if !l.sConfig.NoStarter {
-		entryS := entryG.WithField("starter", l.cStarter.CloudEnvName())
-		if appPort != l.appPort {
-			appEnv = utils.MergeEnv(appEnv, l.cStarter.ProxyEnv(appPort))
-		}
-		entryS.Debug("Setup cloud starter ...")
-		processes[i], err = factory.FromStarter(appEnv, l.profileDir)
-		if err != nil {
-			return err
-		}
-		entryS.Debug("Finished setup cloud starter ...")
-	}
 
 	for _, p := range processes {
 		go p.Start()
@@ -307,6 +244,72 @@ func (l Launcher) Launch() error {
 		return nil
 	}
 	return nil
+}
+
+func (l Launcher) CreateProcesses() (processLen int, processes []*process, err error) {
+	processLen = len(l.sConfig.Sidecars)
+	if !l.sConfig.NoStarter {
+		processLen++
+	}
+	processes = make([]*process, processLen)
+
+	appEnv := utils.OsEnvToMap()
+	i := 0
+	appPort := l.appPort
+	if os.Getenv(AppPortEnvKey) != "" {
+		appPort, err = strconv.Atoi(os.Getenv(AppPortEnvKey))
+		if err != nil {
+			return processLen, processes, err
+		}
+	}
+	for _, sidecar := range l.sConfig.Sidecars {
+		env, err := OverrideEnv(utils.OsEnvToMap(), sidecar.Env)
+		if err != nil {
+			return processLen, processes, NewSidecarError(sidecar, err)
+		}
+		if sidecar.IsRproxy {
+			if l.cStarter != nil && !l.sConfig.NoStarter {
+				env, err = OverrideEnv(env, l.cStarter.ProxyEnv(appPort))
+				if err != nil {
+					return processLen, processes, NewSidecarError(sidecar, err)
+				}
+			}
+			appPort++
+			env, err = OverrideEnv(env, map[string]string{
+				ProxyAppPortEnvKey: fmt.Sprintf("%d", appPort),
+			})
+			if err != nil {
+				return processLen, processes, NewSidecarError(sidecar, err)
+			}
+		}
+		entry := log.WithField("sidecar", sidecar.Name)
+		entry.Debug("Setup sidecar ...")
+		appEnvUnTpl, err := TemplatingEnv(appEnv, sidecar.AppEnv)
+		if err != nil {
+			return processLen, processes, NewSidecarError(sidecar, err)
+		}
+		appEnv = utils.MergeEnv(appEnv, appEnvUnTpl)
+		processes[i], err = l.processFactory.FromSidecar(sidecar, env)
+		if err != nil {
+			return processLen, processes, NewSidecarError(sidecar, err)
+		}
+		i++
+
+		entry.Debug("Finished setup sidecar.")
+	}
+	if !l.sConfig.NoStarter {
+		entryS := log.WithField("starter", l.cStarter.Name())
+		if appPort != l.appPort {
+			appEnv = utils.MergeEnv(appEnv, l.cStarter.ProxyEnv(appPort))
+		}
+		entryS.Debug("Setup cloud starter ...")
+		processes[i], err = l.processFactory.FromStarter(appEnv, l.profileDir)
+		if err != nil {
+			return processLen, processes, err
+		}
+		entryS.Debug("Finished setup cloud starter ...")
+	}
+	return processLen, processes, err
 }
 
 func (l Launcher) handlingSignal(pProcesses *[]*process, processLen int, signalChan chan os.Signal) {
@@ -324,6 +327,7 @@ func (l Launcher) handlingSignal(pProcesses *[]*process, processLen int, signalC
 		// when they receive a signal to not show error
 		signalChan <- sig
 		// if setpgid exist in sysproc, we need to send signal to negative pid (-pid)
+		// this will stop all sub process that one of our sidecars or app has started
 		// we override pid value to let us use process.Process.Signal
 		// instead of non os agnostic syscall funcs
 		if utils.HasPgidSysProcAttr(process.cmd.SysProcAttr) {

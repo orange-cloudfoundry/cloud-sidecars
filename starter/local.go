@@ -2,6 +2,7 @@ package starter
 
 import (
 	"fmt"
+	"github.com/cloudfoundry-community/gautocloud"
 	"github.com/cloudfoundry-community/gautocloud/cloudenv"
 	"gopkg.in/yaml.v2"
 	"io"
@@ -60,8 +61,12 @@ func (Local) getUserStartCommand() string {
 	return startCommandS.StartCommand
 }
 
-func (Local) CloudEnvName() string {
+func (Local) Name() string {
 	return cloudenv.LocalCloudEnv{}.Name()
+}
+
+func (s Local) Detect() bool {
+	return s.Name() == gautocloud.CurrentCloudEnv().Name()
 }
 
 func (s Local) ProxyEnv(appPort int) map[string]string {
