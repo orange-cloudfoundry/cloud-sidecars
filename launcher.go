@@ -93,7 +93,8 @@ func (l Launcher) setupSidecarArtifact(sidecar *config.Sidecar) error {
 	if !ok {
 		return nil
 	}
-	uz := NewUnzip(index.ZipFile, filepath.Dir(index.ZipFile))
+	zipFilePath := filepath.Join(l.sConfig.Dir, index.ZipFile)
+	uz := NewUnzip(zipFilePath, filepath.Dir(zipFilePath))
 	err := uz.Extract()
 	if err != nil {
 		return NewSidecarError(sidecar, err)
@@ -219,13 +220,14 @@ func (l Launcher) DownloadArtifacts() error {
 		if err != nil {
 			return NewSidecarError(sidecar, err)
 		}
-		zipFilePath := filepath.Join(dir, sidecar.Name+".zip")
+		zipFileName := sidecar.Name + ".zip"
+		zipFilePath := filepath.Join(dir, zipFileName)
 		err = DownloadSidecar(zipFilePath, sidecar)
 		if err != nil {
 			return NewSidecarError(sidecar, err)
 		}
 
-		err = l.indexer.UpdateOrCreateIndex(sidecar, zipFilePath)
+		err = l.indexer.UpdateOrCreateIndex(sidecar, filepath.Join(PathSidecarsWd, sidecar.Name, zipFileName))
 		if err != nil {
 			os.Remove(zipFilePath)
 			return NewSidecarError(sidecar, err)
