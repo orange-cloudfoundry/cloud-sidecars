@@ -32,6 +32,7 @@ type Launcher struct {
 	stderr         io.Writer
 	appPort        int
 	processFactory *ProcessFactory
+	indexer        *Indexer
 }
 
 func NewLauncher(
@@ -59,6 +60,7 @@ func NewLauncher(
 		stderr:         stderr,
 		appPort:        appPort,
 		processFactory: NewProcessFactory(stdout, stderr, cStarter, sConfig.Dir),
+		indexer:        NewIndexer(IndexFilePath(sConfig.Dir)),
 	}
 }
 
@@ -84,7 +86,48 @@ func (l Launcher) ShowSidecarsSha1() error {
 	return nil
 }
 
-func (l Launcher) Setup(force bool) error {
+func (l Launcher) setupSidecarArtifact(sidecar *config.Sidecar) error {
+	entry := log.WithField("sidecar", sidecar.Name)
+	entry.Debug("Unzipping artifact ...")
+	index, ok := l.indexer.Index(sidecar)
+	if !ok {
+		return nil
+	}
+	uz := NewUnzip(index.ZipFile, filepath.Dir(index.ZipFile))
+	err := uz.Extract()
+	if err != nil {
+		return NewSidecarError(sidecar, err)
+	}
+	l.indexer.RemoveIndex(index)
+	err = l.indexer.Store()
+	if err != nil {
+		return err
+	}
+	entry.Debug("Finished unzipping artifact ...")
+
+	if sidecar.AfterInstall == "" {
+		return nil
+	}
+
+	entry.Debug("Run after install script ...")
+	env, err := OverrideEnv(utils.OsEnvToMap(), sidecar.Env)
+	if err != nil {
+		return NewSidecarError(sidecar, err)
+	}
+	err = runScript(
+		sidecar.AfterInstall,
+		filepath.Dir(SidecarExecPath(l.sConfig.Dir, sidecar)),
+		utils.EnvMapToOsEnv(env),
+		l.stdout, l.stderr,
+	)
+	if err != nil {
+		return NewSidecarError(sidecar, err)
+	}
+	entry.Debug("Finished running after install script.")
+	return nil
+}
+
+func (l Launcher) Setup() error {
 	entryG := log.WithField("component", "Launcher").WithField("command", "staging")
 	entryG.Infof("Setup sidecars ...")
 	appEnv := make(map[string]string)
@@ -92,14 +135,20 @@ func (l Launcher) Setup(force bool) error {
 	if err != nil {
 		return err
 	}
-	err = l.DownloadArtifacts(force)
+	err = l.DownloadArtifacts()
 	if err != nil {
 		return err
 	}
 	appPort := l.appPort
-	for index, sidecar := range l.sConfig.Sidecars {
+	for id, sidecar := range l.sConfig.Sidecars {
 		entry := entryG.WithField("sidecar", sidecar.Name)
 		entry.Infof("Setup ...")
+
+		err := l.setupSidecarArtifact(sidecar)
+		if err != nil {
+			return err
+		}
+
 		appEnvUnTpl, err := TemplatingEnv(appEnv, sidecar.AppEnv)
 		if err != nil {
 			return err
@@ -109,7 +158,7 @@ func (l Launcher) Setup(force bool) error {
 			appPort++
 		}
 		if sidecar.ProfileD != "" {
-			fileName := fmt.Sprintf("%d_%s.sh", index+1, sidecar.Name)
+			fileName := fmt.Sprintf("%d_%s.sh", id+1, sidecar.Name)
 			entry.Infof("Writing profiled file '%s' ...", fileName)
 			err := ioutil.WriteFile(
 				filepath.Join(l.profileDir, fileName),
@@ -147,7 +196,7 @@ func (l Launcher) Setup(force bool) error {
 	return nil
 }
 
-func (l Launcher) DownloadArtifacts(forceDl bool) error {
+func (l Launcher) DownloadArtifacts() error {
 	entryG := log.WithField("component", "Launcher").WithField("command", "download_artifact")
 	entryG.Info("Start downloading artifacts from sidecars ...")
 	for _, sidecar := range l.sConfig.Sidecars {
@@ -155,54 +204,47 @@ func (l Launcher) DownloadArtifacts(forceDl bool) error {
 			continue
 		}
 		entry := entryG.WithField("sidecar", sidecar.Name)
+
+		shouldDownload, why := l.indexer.ShouldDownload(sidecar)
+		if !shouldDownload && why != "" {
+			return NewSidecarError(sidecar, fmt.Errorf(why))
+		}
+		if !shouldDownload {
+			entry.Info("Skipping downloading, already downloaded.")
+			continue
+		}
 		dir := SidecarDir(l.sConfig.Dir, sidecar.Name)
+		os.RemoveAll(dir)
 		err := os.MkdirAll(dir, os.ModePerm)
 		if err != nil {
 			return NewSidecarError(sidecar, err)
 		}
-		isEmpty, err := IsEmptyDir(dir)
-		if err != nil {
-			return NewSidecarError(sidecar, err)
-		}
-		if !isEmpty && !forceDl {
-			entry.Infof("Skipping downloading from %s (directory not empty, sidecar must be already downloaded)", sidecar.ArtifactURI)
-			return nil
-		}
-		if !isEmpty {
-			err := os.RemoveAll(dir)
-			if err != nil {
-				return NewSidecarError(sidecar, err)
-			}
-			err = os.MkdirAll(dir, os.ModePerm)
-			if err != nil {
-				return NewSidecarError(sidecar, err)
-			}
-		}
-		err = DownloadSidecar(dir, sidecar)
+		zipFilePath := filepath.Join(dir, sidecar.Name+".zip")
+		err = DownloadSidecar(zipFilePath, sidecar)
 		if err != nil {
 			return NewSidecarError(sidecar, err)
 		}
 
-		if sidecar.AfterDownload == "" {
-			continue
+		err = l.indexer.UpdateOrCreateIndex(sidecar, zipFilePath)
+		if err != nil {
+			os.Remove(zipFilePath)
+			return NewSidecarError(sidecar, err)
 		}
 
-		entry.Info("Run after install script ...")
-		env, err := OverrideEnv(utils.OsEnvToMap(), sidecar.Env)
+		err = l.indexer.Store()
 		if err != nil {
-			return NewSidecarError(sidecar, err)
+			return err
 		}
-		err = runScript(
-			sidecar.AfterDownload,
-			filepath.Dir(SidecarExecPath(l.sConfig.Dir, sidecar)),
-			utils.EnvMapToOsEnv(env),
-			l.stdout, l.stderr,
-		)
-		if err != nil {
-			return NewSidecarError(sidecar, err)
-		}
-		entry.Info("Finished running after install script.")
 	}
+	log.Debug("Cleaning non existing sidecars ...")
+	indexToRm := l.indexer.IndexToRemove(l.sConfig.Sidecars)
+	for _, index := range indexToRm {
+		os.RemoveAll(filepath.Dir(index.ZipFile))
+		l.indexer.RemoveIndex(index)
+		l.indexer.Store()
+	}
+	log.Debug("Finished cleaning non existing sidecars ...")
+
 	entryG.Info("Finished downloading artifacts from sidecars.")
 	return nil
 }
@@ -345,6 +387,10 @@ func (l Launcher) handlingSignal(pProcesses *[]*process, processLen int, signalC
 
 func SidecarDir(baseDir, sidecarName string) string {
 	return filepath.Join(baseDir, PathSidecarsWd, sidecarName)
+}
+
+func IndexFilePath(baseDir string) string {
+	return filepath.Join(baseDir, PathSidecarsWd, "index.yml")
 }
 
 func processesNotHaveLen(processes []*process, len int) bool {

@@ -11,6 +11,7 @@ import (
 
 type process struct {
 	cmd             *exec.Cmd
+	cmdHandler      CmdHandler
 	name            string
 	typeP           string
 	noInterrupt     bool
@@ -24,7 +25,7 @@ func (p *process) Start() {
 	entry := log.WithField(p.typeP, p.name)
 	entry.Infof("Starting %s %s ...", p.typeP, p.name)
 	defer p.wg.Done()
-	err := p.cmd.Run()
+	err := p.cmdHandler.Run()
 	if err != nil {
 		// if this come from a signal, we do not considered this as an error
 		select {

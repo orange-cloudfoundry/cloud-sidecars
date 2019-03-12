@@ -78,7 +78,7 @@ By default configuration can be write as a file named `sidecars-config.yml`
 but it use [gautocloud](https://github.com/cloudfoundry-community/gautocloud) for loading configuration.
 You could use instead a cups service named `sidecar-config` for cloud foundry or `SIDECAR_CONFIG_<PARAM>` for heroku/k8s.
 
-Here the configuration file in `sidecars-config.yml` with exemple for [gobis-server]():
+Here the configuration file in `sidecars-config.yml` with exemple for [gobis-server](https://github.com/orange-cloudfoundry/gobis-server):
 
 ```yaml
 # Set to true to not use colors in logs output
@@ -112,9 +112,9 @@ sidecars:
   # Sha1 to ensure to have correct downloaded artifact
   # This is specific sha1 made by zipper, use cloud-sidecars sha1 command to have sha1 to insert here
   artifact_sha1: ""
-  # Run script after downloading your artifact
+  # Run script after setup your artifact
   # here it renames gobis-server_linux_amd64 to gobis-server
-  after_download: "mv * gobis-server"
+  after_install: "mv * gobis-server"
   # pass args to executable
   args: 
   - "--sidecar"

@@ -22,7 +22,7 @@ type Sidecar struct {
 	ArtifactURI         string            `yaml:"artifact_uri" json:"artifact_uri"`
 	ArtifactType        string            `yaml:"artifact_type" json:"artifact_type"`
 	ArtifactSha1        string            `yaml:"artifact_sha1" json:"artifact_sha1"`
-	AfterDownload       string            `yaml:"after_download" json:"after_download"`
+	AfterInstall        string            `yaml:"after_install" json:"after_download"`
 	Args                []string          `yaml:"args" json:"args"`
 	Env                 map[string]string `yaml:"env" json:"env"`
 	AppEnv              map[string]string `yaml:"app_env" json:"app_env"`

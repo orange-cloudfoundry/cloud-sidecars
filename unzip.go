@@ -71,6 +71,7 @@ func (uz Unzip) Extract() error {
 			return err
 		}
 	}
+	os.Remove(uz.Src)
 
 	return nil
 }

@@ -6,14 +6,13 @@ import (
 	"github.com/orange-cloudfoundry/cloud-sidecars/config"
 	log "github.com/sirupsen/logrus"
 	"io"
-	"io/ioutil"
 	"os"
 )
 
-func DownloadSidecar(dir string, c *config.Sidecar) error {
+func DownloadSidecar(zipFilePath string, c *config.Sidecar) error {
 	entry := log.WithField("component", "Downloader").WithField("sidecar", c.Name)
 	entry.Infof("Downloading from %s ...", c.ArtifactURI)
-	err := DownloadArtifact(dir, c.ArtifactURI, c.ArtifactType, c.ArtifactSha1)
+	err := DownloadArtifact(zipFilePath, c.ArtifactURI, c.ArtifactType, c.ArtifactSha1)
 	if err != nil {
 		return err
 	}
@@ -21,7 +20,7 @@ func DownloadSidecar(dir string, c *config.Sidecar) error {
 	return nil
 }
 
-func DownloadArtifact(dir, uri, fileType, sha1 string) error {
+func DownloadArtifact(zipFilePath, uri, fileType, sha1 string) error {
 	s, err := ZipperSess(uri, fileType)
 	if err != nil {
 		return err
@@ -42,15 +41,12 @@ func DownloadArtifact(dir, uri, fileType, sha1 string) error {
 		return err
 	}
 
-	zipLocal, err := ioutil.TempFile("", "downloads-sidecar")
+	zipLocal, err := os.Create(zipFilePath)
 	if err != nil {
 		zipFile.Close()
 		return err
 	}
-	defer func() {
-		zipLocal.Close()
-		os.Remove(zipLocal.Name())
-	}()
+	defer zipLocal.Close()
 
 	_, err = io.Copy(zipLocal, zipFile)
 	if err != nil {
@@ -59,31 +55,7 @@ func DownloadArtifact(dir, uri, fileType, sha1 string) error {
 	}
 	zipFile.Close()
 
-	uz := NewUnzip(zipLocal.Name(), dir)
-	err = uz.Extract()
-	if err != nil {
-		return err
-	}
 	return nil
-}
-
-func IsEmptyDir(name string) (bool, error) {
-	f, err := os.Open(name)
-	if err != nil {
-		return false, err
-	}
-	defer f.Close()
-
-	_, err = f.Readdirnames(1) // Or f.Readdir(1)
-	if err == io.EOF {
-		return true, nil
-	}
-	return false, err // Either not empty or error, suits both cases
-}
-
-func DiffSha1(s *zipper.Session, storedSha1 string) bool {
-	isDiff, _, _ := s.IsDiff(storedSha1)
-	return isDiff
 }
 
 func ZipperSess(uri, fileType string) (*zipper.Session, error) {

@@ -102,23 +102,11 @@ func NewApp(version string) *CloudSidecarApp {
 			Name:   "vendor",
 			Usage:  "Vendor all sidecars in local for offline app",
 			Action: vendorRun,
-			Flags: []cli.Flag{
-				cli.BoolFlag{
-					Name:  "force, f",
-					Usage: "Force downloading even if files are found for sidecar",
-				},
-			},
 		},
 		{
 			Name:   "setup",
 			Usage:  "Download sidecars if needed and create profiled files, this should be run by a staging lifecycle (e.g.: cloud foundry buildpack lifecycle)",
 			Action: setupRun,
-			Flags: []cli.Flag{
-				cli.BoolFlag{
-					Name:  "force, f",
-					Usage: "Force downloading even if files are found for sidecar",
-				},
-			},
 		},
 		{
 			Name:   "sha1",
@@ -150,7 +138,7 @@ func setupRun(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	return l.Setup(c.Bool("force"))
+	return l.Setup()
 }
 
 func launchRun(c *cli.Context) error {
@@ -168,7 +156,7 @@ func vendorRun(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	return l.DownloadArtifacts(c.Bool("force"))
+	return l.DownloadArtifacts()
 }
 
 func initApp(c *cli.Context) {

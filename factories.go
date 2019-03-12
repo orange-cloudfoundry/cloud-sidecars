@@ -12,6 +12,12 @@ import (
 	"sync"
 )
 
+type CmdHandlerFactory func(*exec.Cmd) (CmdHandler, error)
+
+func NoOpCmdHandlerFactory(cmd *exec.Cmd) (CmdHandler, error) {
+	return cmd, nil
+}
+
 type ProcessFactory struct {
 	errChan    chan error
 	signalChan chan os.Signal
@@ -20,6 +26,7 @@ type ProcessFactory struct {
 	stdout     io.Writer
 	stderr     io.Writer
 	cStarter   starter.Starter
+	cmdFactory CmdHandlerFactory
 }
 
 func NewProcessFactory(
@@ -34,7 +41,12 @@ func NewProcessFactory(
 		stdout:     stdout,
 		wd:         wd,
 		cStarter:   cStarter,
+		cmdFactory: NoOpCmdHandlerFactory,
 	}
+}
+
+func (f *ProcessFactory) SetCmdHandlerFactory(cmdFactory CmdHandlerFactory) {
+	f.cmdFactory = cmdFactory
 }
 
 func (f *ProcessFactory) WaitGroup() *sync.WaitGroup {
@@ -61,8 +73,13 @@ func (f *ProcessFactory) FromStarter(env map[string]string, profileDir string) (
 	}
 	// set pgid for sending signal to child
 	cloudCmd.SysProcAttr = utils.PgidSysProcAttr(cloudCmd.SysProcAttr)
+	cmdHandler, err := f.cmdFactory(cloudCmd)
+	if err != nil {
+		return nil, err
+	}
 	return &process{
 		cmd:             cloudCmd,
+		cmdHandler:      cmdHandler,
 		name:            "launcher",
 		typeP:           "cloud",
 		noInterrupt:     true,
@@ -106,8 +123,13 @@ func (f *ProcessFactory) FromSidecar(sidecar *config.Sidecar, env map[string]str
 		cmd.Stdout = f.stdout
 		cmd.Stderr = f.stderr
 	}
+	cmdHandler, err := f.cmdFactory(cmd)
+	if err != nil {
+		return nil, err
+	}
 	return &process{
 		cmd:         cmd,
+		cmdHandler:  cmdHandler,
 		name:        sidecar.Name,
 		typeP:       "sidecar",
 		noInterrupt: sidecar.NoInterruptWhenStop,
