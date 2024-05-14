@@ -14,7 +14,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"gopkg.in/yaml.v2"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -204,7 +203,7 @@ func createLauncher(c *cli.Context, failWhenNoStarter bool) (*sidecars.Launcher,
 			if sidecarEnv != "" {
 				details = fmt.Sprintf("for cloud-env %s", sidecarEnv)
 			}
-			return nil, fmt.Errorf("Could not found starter %s", details)
+			return nil, fmt.Errorf("could not found starter %s", details)
 		}
 		entry.Debug("Finished loading starter.")
 	}
@@ -228,7 +227,7 @@ func retrieveConfig(c *cli.Context) (*config.Sidecars, error) {
 	if _, ok := err.(loader.ErrGiveService); ok {
 		log.Warnf("Cannot found configuration from gautocloud, fallback to %s file", confPath)
 		var b []byte
-		b, err = ioutil.ReadFile(confPath)
+		b, err = os.ReadFile(confPath)
 		if err != nil {
 			return nil, fmt.Errorf("configuration loading from %s error: %s", confPath, err.Error())
 		}
@@ -261,7 +260,7 @@ func findConfPathAndDir(c *cli.Context) (confPath string, dir string) {
 			"Config file not found on %s, trying to auto-find on first sub folder .",
 			confPath,
 		)
-		files, err := ioutil.ReadDir(dir)
+		files, err := os.ReadDir(dir)
 		if err != nil {
 			log.Fatal(err)
 		}

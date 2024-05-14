@@ -5,7 +5,6 @@ import (
 	"github.com/cloudfoundry-community/gautocloud"
 	"gopkg.in/yaml.v2"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,7 +33,7 @@ func (s BuildpackIO) Name() string {
 }
 
 func (BuildpackIO) getUserStartCommand() string {
-	b, err := ioutil.ReadFile(procFile)
+	b, err := os.ReadFile(procFile)
 	if err != nil {
 		return ""
 	}

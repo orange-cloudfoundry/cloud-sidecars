@@ -32,7 +32,7 @@ func DownloadArtifact(zipFilePath, uri, fileType, sha1 string) error {
 			return err
 		}
 		if isDiff {
-			return fmt.Errorf("Sha1 '%s' mismatch with current sha1 '%s'.", sha1, cSha1)
+			return fmt.Errorf("SHA1 '%s' mismatch with current sha1 '%s'", sha1, cSha1)
 		}
 	}
 

@@ -5,7 +5,7 @@ Sidecar will be run locally inside your app and will run real app with configura
 
 If sidecar is a reverse proxy, it will overwrite real app configuration to make run your reverse proxy in front of the app.
 
-For now it only support 2 types:
+For now, it only support 2 types:
 - Cloud foundry through its [buildpack](https://github.com/orange-cloudfoundry/sidecars-buildpack)
 - Locally only for testing purpose before run
 
@@ -74,7 +74,7 @@ GLOBAL OPTIONS:
 
 ## Usage
 
-By default configuration can be write as a file named `sidecars-config.yml` 
+By default, configuration can be written into a file named `sidecars-config.yml` 
 but it use [gautocloud](https://github.com/cloudfoundry-community/gautocloud) for loading configuration.
 You could use instead a cups service named `sidecar-config` for cloud foundry or `SIDECAR_CONFIG_<PARAM>` for heroku/k8s.
 

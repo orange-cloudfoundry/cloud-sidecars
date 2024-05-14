@@ -6,7 +6,6 @@ import (
 	"github.com/cloudfoundry-community/gautocloud/cloudenv"
 	"gopkg.in/yaml.v2"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,7 +40,7 @@ func (s CloudFoundry) Detect() bool {
 }
 
 func (CloudFoundry) getUserStartCommand() string {
-	b, err := ioutil.ReadFile(procFile)
+	b, err := os.ReadFile(procFile)
 	if err != nil {
 		return ""
 	}

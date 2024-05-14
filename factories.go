@@ -101,7 +101,7 @@ func (f *ProcessFactory) FromSidecar(sidecar *config.Sidecar, env map[string]str
 	}
 
 	if _, err := os.Stat(wd); os.IsNotExist(err) {
-		return nil, fmt.Errorf("Workdir '%s' doesn't exists.", wd)
+		return nil, fmt.Errorf("workdir '%s' doesn't exists", wd)
 	}
 
 	args, err := TemplatingArgs(env, sidecar.Args...)

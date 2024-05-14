@@ -6,7 +6,6 @@ import (
 	"github.com/cloudfoundry-community/gautocloud/cloudenv"
 	"gopkg.in/yaml.v2"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
@@ -47,7 +46,7 @@ func (s Local) StartCmd(env []string, profileDir string, stdOut, stdErr io.Write
 }
 
 func (Local) getUserStartCommand() string {
-	b, err := ioutil.ReadFile(procFile)
+	b, err := os.ReadFile(procFile)
 	if err != nil {
 		return ""
 	}
