@@ -35,10 +35,10 @@ type Sidecar struct {
 
 func (c Sidecar) Check() error {
 	if c.Name == "" {
-		return fmt.Errorf("You must provide a name to your sidecar")
+		return fmt.Errorf("you must provide a name to your sidecar")
 	}
 	if c.Executable == "" {
-		return fmt.Errorf("You must provide an executable path to your sidecar")
+		return fmt.Errorf("you must provide an executable path to your sidecar")
 	}
 	return nil
 }

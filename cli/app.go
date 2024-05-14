@@ -204,7 +204,7 @@ func createLauncher(c *cli.Context, failWhenNoStarter bool) (*sidecars.Launcher,
 			if sidecarEnv != "" {
 				details = fmt.Sprintf("for cloud-env %s", sidecarEnv)
 			}
-			return nil, fmt.Errorf("Could not found starter %s", details)
+			return nil, fmt.Errorf("could not found starter %s", details)
 		}
 		entry.Debug("Finished loading starter.")
 	}
