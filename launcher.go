@@ -287,7 +287,6 @@ func (l Launcher) Launch() error {
 	default:
 		return nil
 	}
-	return nil
 }
 
 func (l Launcher) CreateProcesses() (processLen int, processes []*process, err error) {
