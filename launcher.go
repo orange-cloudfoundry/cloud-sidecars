@@ -9,7 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/alessio/shellescape.v1"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -161,7 +160,7 @@ func (l Launcher) Setup() error {
 		if sidecar.ProfileD != "" {
 			fileName := fmt.Sprintf("%d_%s.sh", id+1, sidecar.Name)
 			entry.Infof("Writing profiled file '%s' ...", fileName)
-			err := ioutil.WriteFile(
+			err := os.WriteFile(
 				filepath.Join(l.profileDir, fileName),
 				[]byte(sidecar.ProfileD), 0755)
 			if err != nil {
@@ -187,7 +186,7 @@ func (l Launcher) Setup() error {
 	for k, v := range appEnv {
 		profileLaunch += fmt.Sprintf("export %s=%s\n", k, shellescape.Quote(v))
 	}
-	err = ioutil.WriteFile(
+	err = os.WriteFile(
 		filepath.Join(l.profileDir, "0_starter.sh"),
 		[]byte(profileLaunch), 0755)
 	if err != nil {
