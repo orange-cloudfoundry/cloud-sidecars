@@ -8,6 +8,7 @@ import (
 )
 
 type CmdWriter struct {
+	// nolint:unused
 	cmd *exec.Cmd
 }
 
