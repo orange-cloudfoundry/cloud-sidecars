@@ -214,35 +214,40 @@ func (l Launcher) DownloadArtifacts() error {
 			continue
 		}
 		dir := SidecarDir(l.sConfig.Dir, sidecar.Name)
-		os.RemoveAll(dir)
-		err := os.MkdirAll(dir, os.ModePerm)
-		if err != nil {
+		if err := os.RemoveAll(dir); err != nil {
+			log.Errorf("unable to remove all '%s': %v", dir, err)
+		}
+		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
 			return NewSidecarError(sidecar, err)
 		}
 		zipFileName := sidecar.Name + ".zip"
 		zipFilePath := filepath.Join(dir, zipFileName)
-		err = DownloadSidecar(zipFilePath, sidecar)
-		if err != nil {
+		if err := DownloadSidecar(zipFilePath, sidecar); err != nil {
 			return NewSidecarError(sidecar, err)
 		}
 
-		err = l.indexer.UpdateOrCreateIndex(sidecar, filepath.Join(PathSidecarsWd, sidecar.Name, zipFileName))
-		if err != nil {
-			os.Remove(zipFilePath)
+		if err := l.indexer.UpdateOrCreateIndex(sidecar, filepath.Join(PathSidecarsWd, sidecar.Name, zipFileName)); err != nil {
+			log.Errorf("unable to update or create index for sidecar '%s': %v", sidecar.Name, err)
+			if err2 := os.Remove(zipFilePath); err2 != nil {
+				log.Errorf("unable to remove zip file '%s': %v", zipFilePath, err2)
+			}
 			return NewSidecarError(sidecar, err)
 		}
 
-		err = l.indexer.Store()
-		if err != nil {
+		if err := l.indexer.Store(); err != nil {
 			return err
 		}
 	}
 	log.Debug("Cleaning non existing sidecars ...")
 	indexToRm := l.indexer.IndexToRemove(l.sConfig.Sidecars)
 	for _, index := range indexToRm {
-		os.RemoveAll(filepath.Dir(index.ZipFile))
+		if err := os.RemoveAll(filepath.Dir(index.ZipFile)); err != nil {
+			log.Errorf("unable to remove index file '%s': %v", index.ZipFile, err)
+		}
 		l.indexer.RemoveIndex(index)
-		l.indexer.Store()
+		if err := l.indexer.Store(); err != nil {
+			log.Errorf("error while removing index '%s': %v", index, err)
+		}
 	}
 	log.Debug("Finished cleaning non existing sidecars ...")
 
@@ -255,10 +260,6 @@ func (l Launcher) Launch() error {
 		WithField("command", "launch")
 
 	wg := l.processFactory.WaitGroup()
-	processLen := len(l.sConfig.Sidecars)
-	if !l.sConfig.NoStarter {
-		processLen++
-	}
 	entry.Info("Creating all processes ...")
 	processLen, processes, err := l.CreateProcesses()
 	if err != nil {
@@ -271,7 +272,7 @@ func (l Launcher) Launch() error {
 
 	signalChan := l.processFactory.SignalChan()
 	errChan := l.processFactory.ErrorChan()
-	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
 	// manage graceful shutdown
 	go l.handlingSignal(pProcesses, processLen, signalChan)
@@ -375,13 +376,17 @@ func (l Launcher) handlingSignal(pProcesses *[]*process, processLen int, signalC
 		if utils.HasPgidSysProcAttr(process.cmd.SysProcAttr) {
 			process.cmd.Process.Pid = -process.cmd.Process.Pid
 		}
-		process.cmd.Process.Signal(sig)
+		if err := process.cmd.Process.Signal(sig); err != nil {
+			log.Errorf("failing to send signal '%s' to process '%d'", sig, process.cmd.Process.Pid)
+		}
 	}
 	// if processes still doesn't stop after 20 sec we force shutdown
 	time.Sleep(20 * time.Second)
 	for _, process := range *pProcesses {
 		signalChan <- syscall.SIGKILL
-		process.cmd.Process.Kill()
+		if err := process.cmd.Process.Kill(); err != nil {
+			log.Errorf("failed to kill process '%d': %v", process.cmd.Process.Pid, err)
+		}
 	}
 }
 
