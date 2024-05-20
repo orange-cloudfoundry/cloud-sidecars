@@ -5,7 +5,7 @@ go 1.22.3
 require (
 	github.com/ArthurHlt/zipper v1.3.2
 	github.com/cloudfoundry-community/gautocloud v1.4.0
-	github.com/gliderlabs/sigil v0.10.1
+	github.com/gliderlabs/sigil v0.11.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/urfave/cli v1.22.15

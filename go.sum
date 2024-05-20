@@ -37,8 +37,8 @@ github.com/frankban/quicktest v1.14.6/go.mod h1:4ptaffx2x8+WTWXmUCuVU6aPUX1/Mz7z
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/fsnotify/fsnotify v1.7.0 h1:8JEhPFa5W2WU7YfeZzPNqzMP6Lwt7L2715Ggo0nosvA=
 github.com/fsnotify/fsnotify v1.7.0/go.mod h1:40Bi/Hjc2AVfZrqy+aj+yEI+/bRxZnMJyTJwOpGvigM=
-github.com/gliderlabs/sigil v0.10.1 h1:AgkVmBno3F5TD1SzREvsgo8uvxVT2aAF/fhnJ7kIeE0=
-github.com/gliderlabs/sigil v0.10.1/go.mod h1:tv0oq7Pp52c1a+P3TyJwz0ozJjpEg1X+CcmCklMj3MA=
+github.com/gliderlabs/sigil v0.11.0 h1:RvuFNq5Rrj1kC6/Qtb44Vwaz6+8i8+B/gqYtiFLUQB4=
+github.com/gliderlabs/sigil v0.11.0/go.mod h1:tv0oq7Pp52c1a+P3TyJwz0ozJjpEg1X+CcmCklMj3MA=
 github.com/gliderlabs/ssh v0.2.2 h1:6zsha5zo/TWhRhwqCD3+EarCAgZ2yN28ipRnGPnwkI0=
 github.com/gliderlabs/ssh v0.2.2/go.mod h1:U7qILu1NlMHj9FlMhZLlkCdDnU1DBEAqr0aevW3Awn0=
 github.com/gobwas/glob v0.2.3 h1:A4xDbljILXROh+kObIiy5kIaPYD8e96x1tgBhUI5J+Y=
