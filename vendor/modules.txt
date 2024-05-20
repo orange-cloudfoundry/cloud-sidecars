@@ -47,7 +47,7 @@ github.com/emirpasic/gods/utils
 # github.com/fsnotify/fsnotify v1.7.0
 ## explicit; go 1.17
 github.com/fsnotify/fsnotify
-# github.com/gliderlabs/sigil v0.10.1
+# github.com/gliderlabs/sigil v0.11.0
 ## explicit; go 1.18
 github.com/gliderlabs/sigil
 # github.com/gobwas/glob v0.2.3
