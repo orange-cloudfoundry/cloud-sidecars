@@ -1,13 +1,15 @@
 module github.com/orange-cloudfoundry/cloud-sidecars
 
 go 1.22.3
+toolchain go1.22.8
+
 require (
 	github.com/ArthurHlt/zipper v1.3.2
 	github.com/cloudfoundry-community/gautocloud v1.4.1
 	github.com/gliderlabs/sigil v0.11.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/sirupsen/logrus v1.9.3
-	github.com/urfave/cli v1.22.15
+	github.com/urfave/cli v1.22.16
 	gopkg.in/alessio/shellescape.v1 v1.0.0-20170105083845-52074bc9df61
 	gopkg.in/yaml.v2 v2.4.0
 )
@@ -18,7 +20,7 @@ require (
 	github.com/alessio/shellescape v1.4.2 // indirect
 	github.com/azer/snakecase v1.0.0 // indirect
 	github.com/cloudfoundry-community/go-cfenv v1.18.0 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
