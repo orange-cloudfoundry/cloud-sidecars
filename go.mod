@@ -1,12 +1,13 @@
 module github.com/orange-cloudfoundry/cloud-sidecars
 
-go 1.22.3
+go 1.22.6
+
 toolchain go1.22.8
 
 require (
 	github.com/ArthurHlt/zipper v1.3.2
 	github.com/cloudfoundry-community/gautocloud v1.4.1
-	github.com/gliderlabs/sigil v0.11.0
+	github.com/gliderlabs/sigil v0.11.5
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/urfave/cli v1.22.16
@@ -44,7 +45,7 @@ require (
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/cast v1.7.0 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spf13/viper v1.19.0 // indirect
 	github.com/src-d/gcfg v1.4.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
